@@ -50,7 +50,7 @@ public class Tweet implements Runnable {
          
          if(follower_limits.getRemaining()>=2)
          {
-       follower_id=this.t.getFollowersIDs(user.getId(),cursor1); 
+       follower_id=this.t.getFollowersIDs(user.getId(),-1); 
        
        for (long id : follower_id.getIDs()) {
         //gia kathe follower pairnoume tous followers
@@ -67,7 +67,7 @@ public class Tweet implements Runnable {
            //gia tin lista me ta follower ids tou follower
            if(follower_limits.getRemaining()>=2)
            {
-           followers_follower_id=this.t.getFollowersIDs(follower.getId(),cursor2);
+           followers_follower_id=this.t.getFollowersIDs(follower.getId(),-1);
            
            long[] fofIDS=followers_follower_id.getIDs();
            
@@ -78,7 +78,7 @@ public class Tweet implements Runnable {
            }
            else
            {this.stop(follower_limits.getSecondsUntilReset());}
-       }while ((cursor2 = followers_follower_id.getNextCursor()) != 0);
+       }while ((followers_follower_id.getNextCursor()) != 0);
        
        }
          }
@@ -87,7 +87,7 @@ public class Tweet implements Runnable {
          else
          {this.stop(follower_limits.getSecondsUntilReset());}
        
-   }while ((cursor1 = follower_id.getNextCursor()) != 0);
+   }while ((follower_id.getNextCursor()) != 0);
    
    
       System.out.println("Eksw apo tin while");
@@ -146,7 +146,7 @@ List<Status> statusList = t.getUserTimeline(u.getId());
     //otan kapoio apo ta limits ftasei konta sto 1
     //to thread tha stamataei gia 15 lepta sun 10 deuterolepta gia safe
     public void stop(int time) throws InterruptedException
-    {Thread.currentThread().wait(((time)*1000)+10000);
+    {Thread.currentThread().sleep(((time)*1000)+10000);
     }
 
     @Override
@@ -155,6 +155,7 @@ List<Status> statusList = t.getUserTimeline(u.getId());
          
           this.Find_Followers_of_Followers(this.tweet.getUser());
       } catch (TwitterException ex) {
+          
           java.util.logging.Logger.getLogger(Tweet.class.getName()).log(Level.SEVERE, null, ex);
       }
        
