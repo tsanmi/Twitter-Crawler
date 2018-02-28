@@ -20,6 +20,7 @@ public class File_IO {
     private static final String User_Header = "id,name,screen_name,location,url,description,verified,followers_count,created_at,profile_image_url";
     private File dir;
     private File followers_dir;
+    FileWriter fileWriter = null;
     
     public void make_dir(String s)
     {
@@ -46,7 +47,7 @@ if (!theDir.exists()) {
     
 
     
-    FileWriter fileWriter = null;
+    
 
 
     
@@ -108,8 +109,7 @@ if (!theDir.exists()) {
                fileWriter.append(u.getScreenName());
                fileWriter.append(COMMA_DELIMITER);
                
-               fileWriter.flush();
-               fileWriter.close();
+              
                
                
 
@@ -119,99 +119,22 @@ if (!theDir.exists()) {
         
         catch(Exception e)
             
-        {e.printStackTrace();}
+        {System.out.println("Eror kata tin apothikeusi tou user");
+         e.printStackTrace();}
+                       
+                       
+                        finally
+                               {try{
+                                   fileWriter.flush();
+                                   fileWriter.close(); }
+                               catch(Exception e){
+                                   System.out.println("Eror kata to kleisimo arxeio ston user");
+                                    e.printStackTrace();}
+                               }
        }
        
       
-    } 
-   public void Save_Followers(User u,Twitter t) throws TwitterException, InterruptedException
-   {
-       File theDir=new File(this.dir.getAbsoluteFile()+"\\"+"followers");
-       if (!theDir.exists()) {
-    //System.out.println("creating directory: " + theDir.getName());
-    boolean result = false;
-
-    try{
-        theDir.mkdir();
-        this.followers_dir=theDir;
-        
-        result = true;
-        
-    }catch(Exception e)
-    {e.printStackTrace();}
-    
-       
-   }
-       long cursor = -1;
-                    IDs ids;
-                     RateLimitStatus followers_limits;
-                   
-                  
-                  do {
-                      
-               
-                ids = t.getFollowersIDs(u.getId(), cursor);
-                for (long id : ids.getIDs()) {
-                    twitter4j.User user_followers = t.showUser(id);
-                    followers_limits=user_followers.getRateLimitStatus();
-                     System.out.println("Remaining: " +followers_limits.getRemaining());
-                    if(followers_limits.getRemaining()>=2)
-                    {
-                   // System.out.println("Remaining: " +followers_limits.getRemaining());
-                    this.Followers(user_followers);
-                    
-                    }
-                    else
-                    {Thread.currentThread().wait(((followers_limits.getResetTimeInSeconds())*1000)+10000);}
-                    
-                    }
-                
-                } while ((cursor = ids.getNextCursor()) != 0);
-       
-      
-
-     
-     /*
-   
-*/
-
-    
-   }
-   public void Followers(User u)
-   {
-        File f=new File(this.followers_dir.getAbsoluteFile()+"\\"+u.getName()+"'s info");
-       if(!f.exists())
-       {
-                       try{
-                   
-        
-               fileWriter = new FileWriter(f);
-               
-               fileWriter.append(User_Header.toString());
-                fileWriter.append(NEW_LINE_SEPARATOR);
-
-               
-               fileWriter.append(String.valueOf(u.getId()));
-               fileWriter.append(COMMA_DELIMITER);
-               fileWriter.append(u.getName());
-               fileWriter.append(COMMA_DELIMITER);
-               fileWriter.append(u.getScreenName());
-               fileWriter.append(COMMA_DELIMITER);
-               
-               fileWriter.flush();
-               fileWriter.close();
-               
-               
-
-        
-        }
-        
-        
-        catch(Exception e)
-            
-        {e.printStackTrace();}
-       }
-   }
+    }   
    
    
 }
