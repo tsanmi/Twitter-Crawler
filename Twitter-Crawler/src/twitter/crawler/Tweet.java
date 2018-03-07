@@ -3,6 +3,9 @@ package twitter.crawler;
 import java.util.ArrayList;
     import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
     import twitter4j.*;
     import twitter4j.auth.AccessToken;
@@ -16,6 +19,9 @@ public class Tweet implements Runnable {
    private Twitter t;
    private String hastag;  
    File_IO file=new File_IO();
+   final Lock lock = new ReentrantLock();
+   final Condition notFull  = lock.newCondition(); 
+   final Condition notEmpty = lock.newCondition(); 
     
     public  Tweet(Twitter tw,Status tweet,String h)
     {
@@ -26,11 +32,12 @@ public class Tweet implements Runnable {
     }
     
     
-    public void Find_Followers_of_Followers(User user) throws TwitterException
+    public  synchronized void Find_Followers_of_Followers(User user) throws InterruptedException 
     {
+        
         //pairnoume ton xristi tou tweet
         ArrayList<Long> followers_id = new ArrayList<Long>();
-        
+         RateLimitStatus follower_limits = null;
         
         
          try {
@@ -39,16 +46,16 @@ public class Tweet implements Runnable {
        IDs follower_id = null;
        IDs followers_follower_id = null;
              //pairnoume tous followers tou xristi
-           
+         follower_limits = t.getRateLimitStatus("followers").get("/followers/ids");   
 
        do
    {
-         RateLimitStatus follower_limits = t.getRateLimitStatus("followers").get("/followers/ids");
+        
        
          //elegxoume an logo periorismo mporoume na paroume
          //tin lista me tous followers
-         
-         if(follower_limits.getRemaining()>=2)
+         System.out.println("Apomenoun gia followers :"+follower_limits.getRemaining());
+         if(follower_limits.getRemaining()>=1)
          {
        follower_id=this.t.getFollowersIDs(user.getId(),-1); 
        
@@ -65,7 +72,8 @@ public class Tweet implements Runnable {
            //tote o xristis mas kanei kai ton prosthetoume stin lista me ta ids
            //pali tha prepei na kanoume ton idio elegxo
            //gia tin lista me ta follower ids tou follower
-           if(follower_limits.getRemaining()>=2)
+           System.out.println("Apomenoun gia followers 2 :"+follower_limits.getRemaining());
+           if(follower_limits.getRemaining()>=1)
            {
            followers_follower_id=this.t.getFollowersIDs(follower.getId(),-1);
            
@@ -75,25 +83,32 @@ public class Tweet implements Runnable {
            if(fofIDS.length>Threshold_Of_Followers&& this.check_timeline(user))
            {System.out.println("Plirei: ");
            followers_id.add(user.getId());}
+           
            }
-           else
+           else if(follower_limits.getRemaining()<1)
            {this.stop(follower_limits.getSecondsUntilReset());}
+           else if(followers_follower_id.getNextCursor()==0)
+           {break;}
        }while ((followers_follower_id.getNextCursor()) != 0);
        
        }
+       
          }
          //alliws kanoume to current thread pou exei analabei
          //to psasksimo na perimenei gia oso xrono prepei
-         else
-         {this.stop(follower_limits.getSecondsUntilReset());}
+         else if(follower_limits.getRemaining()<1)
+         {  System.out.println("Telos twn limits");
+            this.stop(follower_limits.getSecondsUntilReset());}
+         else if(follower_id.getNextCursor()==0)
+         {break;}
        
    }while ((follower_id.getNextCursor()) != 0);
    
    
-      System.out.println("Eksw apo tin while");
+    
        for(int i=0;i<followers_id.size();i++)
        {
-            System.out.println("Mesa stin for");
+         
            //ftiaxnoume ena object gia kathe follower tou follower
            twitter4j.User fofollower;
            fofollower=t.showUser(followers_id.get(i));
@@ -112,8 +127,19 @@ public class Tweet implements Runnable {
            
        }
     }
-         catch(Exception e)
-         {e.printStackTrace();}
+        
+         catch(TwitterException ex)
+         {
+             
+             if(ex.getErrorCode()==88){System.out.println("Code :"+ex.getExceptionCode());
+             this.stop(follower_limits.getSecondsUntilReset());}
+         }
+         catch(NullPointerException exe)
+         {System.out.println("Tellos follwers");
+         System.exit(0);
+         }
+        
+         
     }
     
     //pame sto timeline tou user kai blepoume an uparxei to tweet me to 
@@ -122,21 +148,29 @@ public class Tweet implements Runnable {
     //epistrefei ta 3,200 pio prosfata Tweets
     //
     public boolean check_timeline(User u)
-    {
+    {String key=this.hastag.replace("#","");
+        System.out.println("Hastag xwris #: "+key);
        boolean answer=false;
        try{
 List<Status> statusList = t.getUserTimeline(u.getId());
  for (Status status : statusList) {
-  if(status.getText().toLowerCase().contains(this.hastag)){
-   answer= true;
-  }
-  else
-  {answer= false;}
+     twitter4j.HashtagEntity h[];
+     h=status.getHashtagEntities();
+     for(int i=0;i<h.length;i++)
+    {
+        if(h[i].getText().equals(key))
+                {answer=true;}
+     }
+     
+     
+  
  } 
    
     } 
        catch(Exception e)
-                 {e.printStackTrace();} 
+                 {System.out.println("AOYA2");
+                 e.printStackTrace();} 
+       System.out.println("Brethike tweet: "+answer);
        return answer;
     }
    
@@ -146,23 +180,35 @@ List<Status> statusList = t.getUserTimeline(u.getId());
     //otan kapoio apo ta limits ftasei konta sto 1
     //to thread tha stamataei gia 15 lepta sun 10 deuterolepta gia safe
     public void stop(int time) throws InterruptedException
-    {Thread.currentThread().sleep(((time)*1000)+10000);
+    {
+        Thread.sleep(((time)*1000)+10000);
+        
     }
 
     @Override
     public void run() {
-      try {
+      
          
+      try {
           this.Find_Followers_of_Followers(this.tweet.getUser());
-      } catch (TwitterException ex) {
-          
+      } catch (InterruptedException ex) {
           java.util.logging.Logger.getLogger(Tweet.class.getName()).log(Level.SEVERE, null, ex);
       }
+     
+         
+              try {
+              this.stop((15*1000)+10000);
+              } catch (InterruptedException ex1) {
+                 // java.util.logging.Logger.getLogger(Tweet.class.getName()).log(Level.SEVERE, null, ex1);
+              }
+}
+         // java.util.logging.Logger.getLogger(Tweet.class.getName()).log(Level.SEVERE, null, ex);
+      }
        
-    }
+    
 
    
     
-    }
     
+   
 
